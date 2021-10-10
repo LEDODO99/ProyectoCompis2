@@ -84,5 +84,21 @@ public class CommonData {
     public void setScopeBefore(int scopeBefore) {
         this.scopeBefore = scopeBefore;
     }
+
+
+    @Override
+    public String toString() {
+        return "{" +
+            " type='" + getType() + "'" +
+            ", name='" + getName() + "'" +
+            ", signature='" + getSignature() + "'" +
+            ", error='" + getError() + "'" +
+            ", line='" + getLine() + "'" +
+            ", collumn='" + getCollumn() + "'" +
+            ", scopeCurrent='" + getScopeCurrent() + "'" +
+            ", scopeBefore='" + getScopeBefore() + "'" +
+            "}";
+    }
+    
     
 }
