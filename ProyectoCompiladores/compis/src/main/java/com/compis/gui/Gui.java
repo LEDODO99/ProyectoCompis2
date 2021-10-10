@@ -36,6 +36,7 @@ public class Gui implements ActionListener {
         myPanel.add(button);
         myPanel.add(scrollpane2);
 
+        frame.setResizable(false);
         frame.add(myPanel, BorderLayout.CENTER);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setTitle("DECAF COMPILER");
@@ -58,16 +59,16 @@ public class Gui implements ActionListener {
         int lenAct = returnText.length();
         int cont = 0;
         for (int i = 0; i < lenAct; i++) {
-            if (cont == 150) {
+            if (cont == 120) {
                 returnText = returnText.substring(0, i) + "\n" + returnText.substring(i);
                 cont = 0;
             }
             cont++;
-            if (returnText.charAt(i) == '\\' && returnText.charAt(i + 1) == 'n') {
+            if (returnText.charAt(i) == '\n') {
                 cont = 0;
             }
             lenAct = returnText.length();
         }
-        console.setText(returnText);
+        console.setText("Console:\n"+returnText);
     }
 }
