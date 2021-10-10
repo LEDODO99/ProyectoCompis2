@@ -138,6 +138,36 @@ public interface DECAFListener extends ParseTreeListener {
 	 */
 	void exitExpression(DECAFParser.ExpressionContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link DECAFParser#returnStatement}.
+	 * @param ctx the parse tree
+	 */
+	void enterReturnStatement(DECAFParser.ReturnStatementContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DECAFParser#returnStatement}.
+	 * @param ctx the parse tree
+	 */
+	void exitReturnStatement(DECAFParser.ReturnStatementContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DECAFParser#ifStatement}.
+	 * @param ctx the parse tree
+	 */
+	void enterIfStatement(DECAFParser.IfStatementContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DECAFParser#ifStatement}.
+	 * @param ctx the parse tree
+	 */
+	void exitIfStatement(DECAFParser.IfStatementContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link DECAFParser#whileStatement}.
+	 * @param ctx the parse tree
+	 */
+	void enterWhileStatement(DECAFParser.WhileStatementContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link DECAFParser#whileStatement}.
+	 * @param ctx the parse tree
+	 */
+	void exitWhileStatement(DECAFParser.WhileStatementContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link DECAFParser#methodCall}.
 	 * @param ctx the parse tree
 	 */

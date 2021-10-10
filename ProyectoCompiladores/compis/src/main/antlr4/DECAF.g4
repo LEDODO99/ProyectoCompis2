@@ -16,7 +16,6 @@ varType : 'int'
 	| 'char'
 	| 'boolean'
 	| 'struct' ID
-	| structDeclaration
 	| 'void'
 	;
 methodDeclaration : methodType ID '(' ('void'|(parameter)*) ')' block ;
@@ -33,9 +32,9 @@ parameterType : 'int'
 	| 'boolean'
 	;
 block : '{' (varDeclaration)* (statement)* '}' ;
-statement : 'if' '(' expression ')' block ('else' block)?
-	| 'while' '(' expression ')' block
-	| 'return' (expression)? ';'
+statement : ifStatement
+	| whileStatement
+	| returnStatement
 	| methodCall ';'
 	| block
 	| assignment
@@ -50,6 +49,9 @@ expression : location
 	| '!' expression
 	| '{' expression '}'
 	;
+returnStatement: 'return' (expression)? ';';
+ifStatement: 'if' '(' expression ')' block ('else' block)? ;
+whileStatement: 'while' '(' expression ')' block ;
 methodCall : ID '(' (arg)* ')' ;
 arg : expression ;
 op : arith_op
