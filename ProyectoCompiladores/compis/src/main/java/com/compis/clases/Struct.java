@@ -1,7 +1,10 @@
 package com.compis.clases;
 
+import java.util.ArrayList;
+
 public class Struct extends CommonData{
     private int insideScope;
+    private ArrayList<Variable> attributes = new ArrayList<>();
     public Struct(String type, String name, String signature, String error, String line, String collumn,
             int scopeCurrent, int scopeBefore) {
         super(type, name, signature, error, line, collumn, scopeCurrent, scopeBefore);
@@ -13,7 +16,12 @@ public class Struct extends CommonData{
     public int getInsideScope (){
         return insideScope;
     }
-
+    public ArrayList<Variable> getAtributes(){
+        return attributes;
+    }
+    public void addAttribute(Variable newAttribute){
+        attributes.add(newAttribute);
+    }
     public String toString() {
         return "{" +
             " type='" + getType() + "'" +

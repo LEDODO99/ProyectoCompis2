@@ -1,8 +1,12 @@
 package com.compis;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 
 import com.compis.clases.Method;
+import com.compis.clases.MipsConverter;
 import com.compis.clases.Struct;
 import com.compis.clases.SymbolTable;
 import com.compis.clases.Variable;
@@ -20,6 +24,7 @@ public class Compiler extends DECAFBaseListener {
     private boolean passedReturn = false;
     private String currentMethodType;
     private String currentMethodName;
+    private MipsConverter mipsConverter = new MipsConverter();
 
     public Compiler() {
 
@@ -55,17 +60,67 @@ public class Compiler extends DECAFBaseListener {
             returnMessage = returnMessage + errorCount +". Variable Name \"" + ctxName + "\" is already in use in its scope. \n";
         }
         try {
-            if (0 >= Integer.parseInt(ctx.NUM().getText())) {
+            int arraySize=Integer.parseInt(ctx.NUM().getText());
+            if (0 >= arraySize) {
                 noErrors = false;
                 errorCount++;
                 returnMessage = returnMessage + errorCount +". Variable \"" + ctx.ID().getText()
                         + "\" is declared as an array with size of 0 or less. \n";
+            }else{
+                symbolTable.serVarAsArray(ctxName, arraySize);
+                if (ctxType.contains("struct"))
+                {
+                    Struct tempStruct = symbolTable.getStructByName(ctxType.substring(6));
+                    ArrayList<Variable> tempvariables=tempStruct.getAtributes();
+                    for (int i=0; i<arraySize;i++){
+                        for (int j=0;j<tempvariables.size();j++){
+                            structRecursive(tempvariables.get(j),ctxName+i);
+                        }
+                    }
+
+                    for (int i=0;i<tempvariables.size();i++){
+                        String varName = tempStruct.getName()+tempStruct.getScopeCurrent()+tempvariables.get(i).getName();
+                        mipsConverter.addVariable(varName, symbolTable.getScopeCurrent(), tempvariables.get(i).getType(), true, Integer.parseInt(ctx.NUM().getText()));
+                    }
+                }else{
+                    mipsConverter.addVariable(ctxName, symbolTable.getScopeCurrent(), ctxType, true, Integer.parseInt(ctx.NUM().getText()));
+                }
             }
         } catch (Exception e) {
             // nada
         }
-        
+        if (ctxType.contains("struct"))
+        {
+            Struct tempStruct = symbolTable.getStructByName(ctxType.substring(6));
+            ArrayList<Variable> tempvariables=tempStruct.getAtributes();
+            for (int i=0;i<tempvariables.size();i++){
+                structRecursive(tempvariables.get(i),ctxName+symbolTable.getScopeCurrent());
+            }
+        }
+        else
+        {
+            mipsConverter.addVariable(ctxName, symbolTable.getScopeCurrent(), ctxType, false, 0);
+        }
 
+    }
+    public void structRecursive(Variable variableToAdd ,String nameo){
+        if (variableToAdd.getType().contains("struct")){
+            Struct tempStruct = symbolTable.getStructByName(variableToAdd.getType().substring(6));
+            ArrayList<Variable> tempvariables=tempStruct.getAtributes();
+            if (variableToAdd.getIsArray()){
+                for (int i=0; i<variableToAdd.getArraySize();i++){
+                    for (int j=0;j<tempvariables.size();j++){
+                        structRecursive(tempvariables.get(j),nameo+variableToAdd.getName()+i);
+                    }
+                }
+            }else{
+                for (int i=0;i<tempvariables.size();i++){
+                    structRecursive(tempvariables.get(i),nameo+variableToAdd.getName()+symbolTable.getScopeCurrent());
+                }
+            }
+        }else{
+            mipsConverter.addVariable(nameo+variableToAdd.getName(), symbolTable.getScopeCurrent(), variableToAdd.getType(), variableToAdd.getIsArray(), variableToAdd.getArraySize());
+        }
     }
     @Override
     public void enterMethodDeclaration(DECAFParser.MethodDeclarationContext ctx) {
@@ -92,27 +147,31 @@ public class Compiler extends DECAFBaseListener {
         }
         catch (Exception e){}
         currentMethodName=ctxName;
+        mipsConverter.enterMethod(ctxName, symbolTable.getScopeBefore());
     }
     @Override
     public void enterStructDeclaration(DECAFParser.StructDeclarationContext ctx) {
-        ctx.getParent().getRuleIndex();
-
-    int parentTreeIndex = 0;
-    String ctxName = ctx.ID().getText();
-        int parentTreeIndexMinus1 = parentTreeIndex - 1;
-        if (parentTreeIndexMinus1 < 0)
-            parentTreeIndexMinus1 = 0;
+        int varQuant = ctx.varDeclaration().size();
+        ArrayList<String> listOfNames = new ArrayList<>();
+        ArrayList<String> lsitOfTypes = new ArrayList<>();
+        for (int i=0;i<varQuant;i++){
+            listOfNames.add(ctx.varDeclaration(i).ID().getText());
+            lsitOfTypes.add(ctx.varDeclaration(i).varType().getText());
+        }
+        String ctxName = ctx.ID().getText();
         //symbolTables.add(new SymbolTable(parentTreeIndex, parentTreeIndexMinus1, 0));
-        boolean methodAdded = symbolTable.addStruct(ctxName, null);
-        if (!methodAdded) {
+        boolean structAdded = symbolTable.addStruct(ctxName, null, listOfNames,lsitOfTypes);
+        if (!structAdded) {
             noErrors = false;
             errorCount++;
             returnMessage = returnMessage + errorCount +". Struct Name \"" + ctxName + "\" is already in use. \n";
         }
+        mipsConverter.addStruct(ctxName, symbolTable.getScopeBefore());
     }
     @Override
     public void exitStructDeclaration(DECAFParser.StructDeclarationContext ctx){
         symbolTable.goUpScope();
+        mipsConverter.exitStruct();
     }
     @Override
     public void exitMethodDeclaration(DECAFParser.MethodDeclarationContext ctx){
@@ -125,6 +184,7 @@ public class Compiler extends DECAFBaseListener {
         passedReturn=false;
         currentMethodName = null;
         symbolTable.goUpScope();
+        mipsConverter.exitMethod();
     }
     @Override
     public void enterReturnStatement(DECAFParser.ReturnStatementContext ctx){
@@ -206,16 +266,54 @@ public class Compiler extends DECAFBaseListener {
         }
     }
     @Override
+    public void exitProgram(DECAFParser.ProgramContext ctx){
+        ArrayList<Variable> variables=symbolTable.getAllVariables();
+        ArrayList<Method> methods=symbolTable.getAllMethods();
+        ArrayList<Struct> structs=symbolTable.getAllStructs();
+        for (int i=0; i<variables.size();i++){
+            System.out.println(variables.get(i).toString());
+        }
+        boolean hasMainMethod=symbolTable.getMethodInScope(0,"main")!=null;
+        if (!hasMainMethod){
+            noErrors=false;
+            errorCount++;
+            returnMessage = returnMessage + errorCount +" No main method\n";
+        }
+        if (noErrors){
+            String MIPSProgram = mipsConverter.finishUp();
+            try{
+                BufferedWriter writer = new BufferedWriter(new FileWriter("mipsCompilado.asm"));
+                writer.write(MIPSProgram);
+                
+                writer.close();
+            }catch(IOException ex){
+                //nada
+            }
+        }
+
+    }
+    @Override
     public void enterMethodCall(DECAFParser.MethodCallContext ctx){
         int argAmount = ctx.arg().size();
         String methodName = ctx.ID().getText();
         Method returnMethod = symbolTable.getMethodByName(methodName);
+        System.out.println(returnMethod.toString());
         if (returnMethod==null){
             noErrors = false;
             errorCount++;
             returnMessage = returnMessage + errorCount +". " +methodName+" used before Declaration\n";
         }else{
             ArrayList<Variable> paramListToFulfil = returnMethod.getParameters();
+            System.out.println("PAramListTOFulfil");
+            for (int i=0; i<paramListToFulfil.size();i++){
+                System.out.println(paramListToFulfil.get(i).toString());
+            }
+            System.out.println("Segundo FOr");
+            for (int i=0; i<ctx.arg().size();i++){
+                System.out.println(ctx.arg(i).getText());
+                System.out.println(paramListToFulfil.get(i).getType());
+                System.out.println("Current Scope: "+symbolTable.getScopeCurrent());
+            }
             if (paramListToFulfil.size()==argAmount){
                 for (int i=0; i<argAmount;i++){
                     if (!recursiveExpressionType(ctx.arg(i).expression(), symbolTable.getScopeCurrent()).equals(paramListToFulfil.get(i).getType())){
@@ -263,6 +361,7 @@ public class Compiler extends DECAFBaseListener {
         }catch (Exception e){
             
         }
+
         return varType;
     }
     private String MethodCallType(DECAFParser.MethodCallContext ctx){
@@ -287,14 +386,14 @@ public class Compiler extends DECAFBaseListener {
                     eqTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-
+                    System.out.println("Operator not == or !=");
                 }
                 try{
                     DECAFParser.Cond_opContext condTempCtx = ctx.cond_op();
                     condTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-
+                    System.out.println("Operator not || or &&");
                 }
             }else if(type1.equals("int")){
                 try{
@@ -302,21 +401,21 @@ public class Compiler extends DECAFBaseListener {
                     eqTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-
+                    System.out.println("Operator not == or !=");
                 }
                 try{
                     DECAFParser.Rel_opContext relTempCtx = ctx.rel_op();
                     relTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-
+                    System.out.println("Operator not <, >, >=, <= ");
                 }
                 try{
                     DECAFParser.Arith_opContext arithTempCtx = ctx.arith_op();
                     arithTempCtx.toString();
                     return "int";
                 }catch (Exception e){
-
+                    System.out.println("Operator not +, -, *, / or % ");
                 }
             }else{
                 try{
@@ -324,14 +423,14 @@ public class Compiler extends DECAFBaseListener {
                     eqTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-
+                    System.out.println("Operator not == or !=");
                 }
                 try{
                     DECAFParser.Rel_opContext relTempCtx = ctx.rel_op();
                     relTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-
+                    System.out.println("Operator not <, >, >=, <= ");
                 }
             }
             return null;
@@ -343,21 +442,21 @@ public class Compiler extends DECAFBaseListener {
             tempIntCtx.toString();
             return "int";
         }catch (Exception e){
-
+            System.out.println("Literal not int");
         }
         try{
             DECAFParser.Char_literalContext tempIntCtx = ctx.char_literal();
             tempIntCtx.toString();
             return "char";
         }catch (Exception e){
-
+            System.out.println("Literal not char");
         }
         try{
             DECAFParser.Bool_literalContext tempIntCtx = ctx.bool_literal();
             tempIntCtx.toString();
             return "boolean";
         }catch (Exception e){
-
+            System.out.println("Literal not bool");
         }
         return null;
     }
@@ -368,7 +467,7 @@ public class Compiler extends DECAFBaseListener {
             tempctx.toString();
             return recursiveLocationType(tempctx, symbolTable.getScopeCurrent());
         }catch(Exception e){
-
+            System.out.println("Literal not int");
         }
         //methodCall
         try{
@@ -420,23 +519,5 @@ public class Compiler extends DECAFBaseListener {
 
         }
         return null;
-    }
-    @Override
-    public void exitProgram(DECAFParser.ProgramContext ctx){
-        ArrayList<Struct> structs = symbolTable.getAttStructs();
-        ArrayList<Method> methods = symbolTable.getAllMethods();
-        ArrayList<Variable> variables = symbolTable.getAllVariables();
-        System.out.println("Structs");
-        for (int i=0; i<structs.size();i++){
-            System.out.println(structs.get(i).toString());
-        }
-        System.out.println("Methods");
-        for (int i=0; i<methods.size();i++){
-            System.out.println(methods.get(i).toString());
-        }
-        System.out.println("Variables");
-        for (int i=0; i<variables.size();i++){
-            System.out.println(variables.get(i).toString());
-        }
-    }
+    } 
 }

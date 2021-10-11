@@ -119,11 +119,14 @@ public class SymbolTable {
             return true;
         }
     }
-    public boolean addStruct(String name, String type) {
+    public boolean addStruct(String name, String type, ArrayList<String> attrNames, ArrayList<String> attrTypes) {
         if (doesNameExist(name)) {
             return false;
         } else {
             Struct newstruct= new Struct(type, name, null, null, null, null, scopeCurrent, scopeBefore);
+            for (int i=0; i<attrNames.size();i++){
+                newstruct.addAttribute(new Variable(attrTypes.get(i),attrNames.get(i),null,null,null,null,scopes.size()-1, scopeCurrent));
+            }
             newstruct.setInsideScope(structs.size());
             structs.add(newstruct);
             this.scopes.add("Struct"+name);
@@ -142,6 +145,10 @@ public class SymbolTable {
     public int getScopeCurrent() {
         return this.scopeCurrent;
     }
+    public void serVarAsArray(String varname,int arraySize){
+        getVariableInScope(scopeCurrent,varname).setArraySize(arraySize);
+        getVariableInScope(scopeCurrent,varname).setIsArray(true);
+    }
 
     public int getScopeBefore() {
         return this.scopeBefore;
@@ -150,7 +157,7 @@ public class SymbolTable {
         int tempScope = scope;
         while (tempScope>=0){
             for (int i=0; i < variables.size(); i++){
-                if (variables.get(i).getName().equals(name)){
+                if (variables.get(i).getName().equals(name)&&(tempScope==variables.get(i).getScopeCurrent())){
                     return variables.get(i);
                 }
             }
@@ -174,7 +181,7 @@ public class SymbolTable {
         int tempScope = scope;
         while (tempScope>=0){
             for (int i=0; i < structs.size(); i++){
-                if (structs.get(i).getName().equals(name)){
+                if (structs.get(i).getName().equals(name)&&(tempScope==structs.get(i).getScopeCurrent())){
                     return structs.get(i);
                 }
             }
@@ -200,7 +207,7 @@ public class SymbolTable {
     public ArrayList<Method> getAllMethods(){
         return methods;
     }
-    public ArrayList<Struct> getAttStructs(){
+    public ArrayList<Struct> getAllStructs(){
         return structs;
     }
     public void addParameter(String name, String type){
