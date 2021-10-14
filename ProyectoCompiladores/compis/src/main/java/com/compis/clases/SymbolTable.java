@@ -125,14 +125,14 @@ public class SymbolTable {
         } else {
             Struct newstruct= new Struct(type, name, null, null, null, null, scopeCurrent, scopeBefore);
             for (int i=0; i<attrNames.size();i++){
-                newstruct.addAttribute(new Variable(attrTypes.get(i),attrNames.get(i),null,null,null,null,scopes.size()-1, scopeCurrent));
+                newstruct.addAttribute(new Variable(attrTypes.get(i),attrNames.get(i),null,null,null,null,scopes.size(), scopeCurrent));
             }
-            newstruct.setInsideScope(structs.size());
             structs.add(newstruct);
             this.scopes.add("Struct"+name);
             this.scopeBefore = this.scopeCurrent;
             this.scopeBefores.add(this.scopeBefore);
             this.scopeCurrent = scopes.size()-1;
+            newstruct.setInsideScope(this.scopeCurrent);
             return true;
         }
     }
