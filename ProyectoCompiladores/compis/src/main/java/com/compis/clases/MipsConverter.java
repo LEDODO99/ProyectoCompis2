@@ -16,8 +16,8 @@ public class MipsConverter {
             if (isArray){
                 for (int i=1; i<arraySize;i++){
                     returnValue = returnValue + ", "+getEmptyVarValue(type);
-                    dataDeclaration = dataDeclaration + returnValue + "\n";
                 }
+                dataDeclaration = dataDeclaration + returnValue + "\n";
             }else{
                 dataDeclaration = dataDeclaration + returnValue + "\n";
             }
