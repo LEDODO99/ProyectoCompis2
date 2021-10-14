@@ -54,6 +54,7 @@ public class Compiler extends DECAFBaseListener {
         String ctxType = ctx.varType().getText();
         //symbolTables.add(new SymbolTable(parentTreeIndex, parentTreeIndexMinus1, 0));
         boolean variableAdded = symbolTable.addVariable(ctxName, ctxType);
+        boolean isArray=false;
         if (!variableAdded) {
             noErrors = false;
             errorCount++;
@@ -61,6 +62,7 @@ public class Compiler extends DECAFBaseListener {
         }
         try {
             int arraySize=Integer.parseInt(ctx.NUM().getText());
+            isArray=true;
             if (0 >= arraySize) {
                 noErrors = false;
                 errorCount++;
@@ -77,11 +79,6 @@ public class Compiler extends DECAFBaseListener {
                             structRecursive(tempvariables.get(j),ctxName+i);
                         }
                     }
-
-                    for (int i=0;i<tempvariables.size();i++){
-                        String varName = tempStruct.getName()+tempStruct.getScopeCurrent()+tempvariables.get(i).getName();
-                        mipsConverter.addVariable(varName, symbolTable.getScopeCurrent(), tempvariables.get(i).getType(), true, Integer.parseInt(ctx.NUM().getText()));
-                    }
                 }else{
                     mipsConverter.addVariable(ctxName, symbolTable.getScopeCurrent(), ctxType, true, Integer.parseInt(ctx.NUM().getText()));
                 }
@@ -89,6 +86,7 @@ public class Compiler extends DECAFBaseListener {
         } catch (Exception e) {
             // nada
         }
+        if(!isArray){
         if (ctxType.contains("struct"))
         {
             Struct tempStruct = symbolTable.getStructByName(ctxType.substring(6));
@@ -100,10 +98,11 @@ public class Compiler extends DECAFBaseListener {
         else
         {
             mipsConverter.addVariable(ctxName, symbolTable.getScopeCurrent(), ctxType, false, 0);
-        }
+        }}
 
     }
     public void structRecursive(Variable variableToAdd ,String nameo){
+        variableToAdd=symbolTable.getVariableInScope(variableToAdd.getScopeCurrent(), variableToAdd.getName());
         if (variableToAdd.getType().contains("struct")){
             Struct tempStruct = symbolTable.getStructByName(variableToAdd.getType().substring(6));
             ArrayList<Variable> tempvariables=tempStruct.getAtributes();
@@ -119,6 +118,9 @@ public class Compiler extends DECAFBaseListener {
                 }
             }
         }else{
+            ArrayList<Variable> variables = symbolTable.getAllVariables();
+            for (int i=0; i<variables.size();i++){
+            }
             mipsConverter.addVariable(nameo+variableToAdd.getName(), symbolTable.getScopeCurrent(), variableToAdd.getType(), variableToAdd.getIsArray(), variableToAdd.getArraySize());
         }
     }
@@ -145,7 +147,8 @@ public class Compiler extends DECAFBaseListener {
                 symbolTable.addParameter(ctx.parameter(i).ID().getText(), ctx.parameter(i).parameterType().getText());
             }
         }
-        catch (Exception e){}
+        catch (Exception e){
+        }
         currentMethodName=ctxName;
         mipsConverter.enterMethod(ctxName, symbolTable.getScopeBefore());
     }
@@ -197,13 +200,13 @@ public class Compiler extends DECAFBaseListener {
             }else{
                 try{
                     String methodName = ctx.expression().methodCall().ID().getText();
-                    String methodType = MethodCallType(ctx.expression().methodCall());
-                    if (methodType==null){
+                    String returnType = recursiveExpressionType(ctx.expression(), symbolTable.getScopeCurrent());
+                    if (returnType==null){
                         noErrors=false;
                         errorCount++;
                         returnMessage = returnMessage + errorCount +". Method \"" + currentMethodName +"\" referenced before declaration\n";
                     }else{
-                        boolean equals = methodType.equals(currentMethodType);
+                        boolean equals = returnType.equals(currentMethodType);
                         if (!equals){
                             noErrors=false;
                             errorCount++;
@@ -211,20 +214,6 @@ public class Compiler extends DECAFBaseListener {
                         }
                     }
                 }catch(Exception e){
-                    try{
-                        String typeofLocation = recursiveLocationType(ctx.expression().location(), symbolTable.getScopeCurrent());
-                        if(typeofLocation==null){
-                            noErrors=false;
-                            errorCount++;
-                            returnMessage = returnMessage + errorCount +" \"" + ctx.expression().location().getText() +"\" does not exist in the scope for \""+currentMethodName+"\" or possition expresion is not a number\n";
-                        }
-                        else if (!typeofLocation.equals(currentMethodType)){
-                            noErrors=false;
-                            errorCount++;
-                            returnMessage = returnMessage + errorCount +". Return types for \"" + currentMethodName +"\" and \""+ ctx.expression().location().getText() + "\" not the same\n";
-                        }
-                    }catch(Exception ex){
-                    }
                 }
             }
         }
@@ -271,7 +260,6 @@ public class Compiler extends DECAFBaseListener {
         ArrayList<Method> methods=symbolTable.getAllMethods();
         ArrayList<Struct> structs=symbolTable.getAllStructs();
         for (int i=0; i<variables.size();i++){
-            System.out.println(variables.get(i).toString());
         }
         boolean hasMainMethod=symbolTable.getMethodInScope(0,"main")!=null;
         if (!hasMainMethod){
@@ -287,7 +275,6 @@ public class Compiler extends DECAFBaseListener {
                 
                 writer.close();
             }catch(IOException ex){
-                //nada
             }
         }
 
@@ -297,23 +284,12 @@ public class Compiler extends DECAFBaseListener {
         int argAmount = ctx.arg().size();
         String methodName = ctx.ID().getText();
         Method returnMethod = symbolTable.getMethodByName(methodName);
-        System.out.println(returnMethod.toString());
         if (returnMethod==null){
             noErrors = false;
             errorCount++;
             returnMessage = returnMessage + errorCount +". " +methodName+" used before Declaration\n";
         }else{
             ArrayList<Variable> paramListToFulfil = returnMethod.getParameters();
-            System.out.println("PAramListTOFulfil");
-            for (int i=0; i<paramListToFulfil.size();i++){
-                System.out.println(paramListToFulfil.get(i).toString());
-            }
-            System.out.println("Segundo FOr");
-            for (int i=0; i<ctx.arg().size();i++){
-                System.out.println(ctx.arg(i).getText());
-                System.out.println(paramListToFulfil.get(i).getType());
-                System.out.println("Current Scope: "+symbolTable.getScopeCurrent());
-            }
             if (paramListToFulfil.size()==argAmount){
                 for (int i=0; i<argAmount;i++){
                     if (!recursiveExpressionType(ctx.arg(i).expression(), symbolTable.getScopeCurrent()).equals(paramListToFulfil.get(i).getType())){
@@ -339,17 +315,17 @@ public class Compiler extends DECAFBaseListener {
         //expression is int
         try{
             DECAFParser.ExpressionContext tempctx = ctx.expression();
-            tempctx.toString();
+            
+            tempctx.getText();
             if (!recursiveExpressionType(tempctx,scope).equals("int")){
                 return null;
             }
         }catch (Exception e){
-            
         }
         //location exists
         try{
             DECAFParser.LocationContext tempctx= ctx.location();
-            tempctx.toString();
+            tempctx.getText();
             if (!varType.contains("struct")){
                 return null;
             }else{
@@ -359,7 +335,6 @@ public class Compiler extends DECAFBaseListener {
                 return (recursiveLocationType(tempctx, newScope));
             }
         }catch (Exception e){
-            
         }
 
         return varType;
@@ -386,36 +361,31 @@ public class Compiler extends DECAFBaseListener {
                     eqTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-                    System.out.println("Operator not == or !=");
                 }
                 try{
                     DECAFParser.Cond_opContext condTempCtx = ctx.cond_op();
                     condTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-                    System.out.println("Operator not || or &&");
                 }
             }else if(type1.equals("int")){
-                try{
-                    DECAFParser.Eq_opContext eqTempCtx = ctx.eq_op();
-                    eqTempCtx.toString();
-                    return "boolean";
-                }catch (Exception e){
-                    System.out.println("Operator not == or !=");
-                }
                 try{
                     DECAFParser.Rel_opContext relTempCtx = ctx.rel_op();
                     relTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-                    System.out.println("Operator not <, >, >=, <= ");
+                }
+                try{
+                    DECAFParser.Eq_opContext eqTempCtx = ctx.eq_op();
+                    eqTempCtx.toString();
+                    return "boolean";
+                }catch (Exception e){
                 }
                 try{
                     DECAFParser.Arith_opContext arithTempCtx = ctx.arith_op();
                     arithTempCtx.toString();
                     return "int";
                 }catch (Exception e){
-                    System.out.println("Operator not +, -, *, / or % ");
                 }
             }else{
                 try{
@@ -423,14 +393,12 @@ public class Compiler extends DECAFBaseListener {
                     eqTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-                    System.out.println("Operator not == or !=");
                 }
                 try{
                     DECAFParser.Rel_opContext relTempCtx = ctx.rel_op();
                     relTempCtx.toString();
                     return "boolean";
                 }catch (Exception e){
-                    System.out.println("Operator not <, >, >=, <= ");
                 }
             }
             return null;
@@ -442,21 +410,18 @@ public class Compiler extends DECAFBaseListener {
             tempIntCtx.toString();
             return "int";
         }catch (Exception e){
-            System.out.println("Literal not int");
         }
         try{
             DECAFParser.Char_literalContext tempIntCtx = ctx.char_literal();
             tempIntCtx.toString();
             return "char";
         }catch (Exception e){
-            System.out.println("Literal not char");
         }
         try{
             DECAFParser.Bool_literalContext tempIntCtx = ctx.bool_literal();
             tempIntCtx.toString();
             return "boolean";
         }catch (Exception e){
-            System.out.println("Literal not bool");
         }
         return null;
     }
@@ -467,7 +432,6 @@ public class Compiler extends DECAFBaseListener {
             tempctx.toString();
             return recursiveLocationType(tempctx, symbolTable.getScopeCurrent());
         }catch(Exception e){
-            System.out.println("Literal not int");
         }
         //methodCall
         try{
@@ -475,7 +439,6 @@ public class Compiler extends DECAFBaseListener {
             tempctx.toString();
             return MethodCallType(tempctx);
         }catch(Exception e){
-
         }
         //literal
         try{
@@ -495,7 +458,6 @@ public class Compiler extends DECAFBaseListener {
             return operationType(type1, type2, tempOpCtx);
             
         }catch(Exception e){
-
         }
         //expression
         try{
@@ -516,7 +478,6 @@ public class Compiler extends DECAFBaseListener {
                 return recursiveExpressionType(ctx.expression(0),scope);
             }
         }catch(Exception e){
-
         }
         return null;
     } 
