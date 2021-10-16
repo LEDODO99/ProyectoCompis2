@@ -36,7 +36,6 @@ public class Gui implements ActionListener {
         myPanel.add(button);
         myPanel.add(scrollpane2);
 
-        frame.setResizable(false);
         frame.add(myPanel, BorderLayout.CENTER);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setTitle("DECAF COMPILER");

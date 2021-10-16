@@ -50,7 +50,8 @@ expression : location
 	| '{' expression '}'
 	;
 returnStatement: 'return' (expression)? ';';
-ifStatement: 'if' '(' expression ')' block ('else' block)? ;
+ifStatement: 'if' '(' expression ')' block (elseStatement)? ;
+elseStatement: 'else' block;
 whileStatement: 'while' '(' expression ')' block ;
 methodCall : ID '(' (arg)* ')' ;
 arg : expression ;

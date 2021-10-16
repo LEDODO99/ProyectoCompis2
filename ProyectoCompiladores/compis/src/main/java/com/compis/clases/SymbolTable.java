@@ -119,14 +119,23 @@ public class SymbolTable {
             return true;
         }
     }
-    public boolean addStruct(String name, String type, ArrayList<String> attrNames, ArrayList<String> attrTypes) {
+    public boolean addStruct(String name, String type, ArrayList<String> attrNames, ArrayList<String> attrTypes, ArrayList<Integer> arrayLengths) {
         if (doesNameExist(name)) {
             return false;
         } else {
             Struct newstruct= new Struct(type, name, null, null, null, null, scopeCurrent, scopeBefore);
+            int structSize=0;
             for (int i=0; i<attrNames.size();i++){
+                if(attrTypes.get(i).equals("int"))
+                    structSize+=(4*arrayLengths.get(i));
+                else if(attrTypes.get(i).equals("char")||attrTypes.get(i).equals("boolean")){
+                    structSize+=(arrayLengths.get(i));
+                }else{
+                    structSize+=(getStructInScope(scopeCurrent, attrTypes.get(i).substring(6)).getMemorySize()*arrayLengths.get(i));
+                }
                 newstruct.addAttribute(new Variable(attrTypes.get(i),attrNames.get(i),null,null,null,null,scopes.size(), scopeCurrent));
             }
+            newstruct.setMemorySize(structSize);
             structs.add(newstruct);
             this.scopes.add("Struct"+name);
             this.scopeBefore = this.scopeCurrent;

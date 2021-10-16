@@ -2,24 +2,133 @@ package com.compis.clases;
 
 import java.util.ArrayList;
 
+import com.compis.DECAFParser;
+
 public class MipsConverter {
 
-    int registerOcupationDepth=0;
-    boolean inMain=false;
-    boolean inStruct=false;
-    String dataDeclaration="";
-    String textDeclaration="";
-    ArrayList<String> structs = new ArrayList<>();
-    public void addVariable(String variableName, int scope, String type, boolean isArray, int arraySize){
-        String returnValue = variableName + scope +": "+getMipsVarType(type);
-        if(!inStruct){
-            if (isArray){
-                for (int i=1; i<arraySize;i++){
-                    returnValue = returnValue + ", "+getEmptyVarValue(type);
+    private int registerOcupationDepth=0;
+    private boolean inMain=false;
+    private boolean inStruct=false;
+    private String dataDeclaration="";
+    private String textDeclaration="";
+    private ArrayList<String> structs = new ArrayList<>();
+
+
+    private ArrayList<String> ifs = new ArrayList<>();
+    private ArrayList<String> whiles = new ArrayList<>();
+    private ArrayList<Integer> ifNumbers = new ArrayList<>();
+    private ArrayList<Integer> whileNumbers = new ArrayList<>();
+    private ArrayList<Integer> ifScopes = new ArrayList<>();
+    private ArrayList<Integer> whileScopes = new ArrayList<>();
+
+    public MipsConverter(){
+        whileNumbers.add(0);
+        ifNumbers.add(0);
+    }
+    
+    public void addAssigment(DECAFParser.AssignmentContext ctx, int scope, SymbolTable symbolTable){
+        //save expression to register
+        recursiveExpressionWriter(ctx.expression(), symbolTable, scope);
+        //save register to variable
+        String variableName = ctx.location().ID().getText();
+        Variable tempVariable = symbolTable.getVariableInScope(scope, variableName);
+        String type = tempVariable.getType();
+        String saveLine="";
+        if (type.equals("int")){
+            saveLine="sw $t"+registerOcupationDepth+", "+variableName+tempVariable.getScopeCurrent();
+            //Checking if array
+            try{
+                Integer.parseInt(ctx.location().expression().getText());
+                registerOcupationDepth++;
+                recursiveExpressionWriter(ctx.location().expression(), symbolTable, scope);
+                registerOcupationDepth--;
+                saveLine=saveLine+"($t"+(registerOcupationDepth+1)+")";
+            }catch (Exception e){
+
+            }
+        }else if (type.contains("struct")){
+            Struct tempStruct=symbolTable.getStructInScope(scope, type.substring(6));
+            String attribute = ctx.location().location().ID().getText();
+            int offset = 0;
+            for (int i=0;i<tempStruct.getAtributes().size();i++){
+                if(!tempStruct.getAtributes().get(i).getName().equals(attribute)){
+                    if(tempStruct.getAtributes().get(i).getType().equals("int")){
+                        offset+=4;
+                    }else if(tempStruct.getAtributes().get(i).getType().contains("struct")){
+                        offset+=symbolTable.getStructInScope(tempVariable.scopeCurrent, tempStruct.getAtributes().get(i).getType().substring(6)).getMemorySize();
+                    }else{
+                        offset+=1;
+                    }
+                }else{
+                    if(tempStruct.getAtributes().get(i).getType().equals("int")){
+                        //Checking if attribute is array
+                        try{
+                            int position = Integer.parseInt(ctx.location().location().expression().getText());
+                            offset+=(position*4);
+                        }catch(Exception e){
+            
+                        }
+                        saveLine="sw $t"+registerOcupationDepth+", "+variableName +tempVariable.getScopeCurrent() +"+"+offset;
+                    }else{
+                        try{
+                            int position = Integer.parseInt(ctx.location().location().expression().getText());
+                            offset+=(position);
+                        }catch(Exception e){
+            
+                        }
+                        saveLine="sb $t"+registerOcupationDepth+", "+variableName +tempVariable.getScopeCurrent() +"+"+offset;
+                    }
+                    break;
                 }
-                dataDeclaration = dataDeclaration + returnValue + "\n";
+            }
+            //Checking if array
+            try{
+                ctx.location().expression().getText();
+                registerOcupationDepth++;
+                recursiveExpressionWriter(ctx.location().expression(), symbolTable, scope);
+                registerOcupationDepth--;
+                saveLine=saveLine+"($t"+(registerOcupationDepth+1)+")";
+            }catch (Exception e){
+
+            }
+            
+        }else{
+            saveLine="sb $t"+registerOcupationDepth+", "+variableName+tempVariable.getScopeCurrent();
+            //Checking if array
+            try{
+                Integer.parseInt(ctx.location().expression().getText());
+                registerOcupationDepth++;
+                recursiveExpressionWriter(ctx.location().expression(), symbolTable, scope);
+                registerOcupationDepth--;
+                saveLine=saveLine+"($t"+(registerOcupationDepth+1)+")";
+            }catch (Exception e){
+
+            }
+        }
+        textDeclaration = textDeclaration+saveLine+"\n";
+    }
+
+    
+
+    public void addVariable(String variableName, int scope, String type, boolean isArray, int arraySize, int scopeMemorySize){
+        if(!inStruct){
+            String returnValue = variableName + scope +": "+getMipsVarType(type);
+            if(type.contains("struct")){
+                if (isArray){
+                    returnValue = variableName+scope+": .space "+(scopeMemorySize*arraySize);
+                }else{
+                    returnValue = variableName+scope+": .space "+scopeMemorySize;
+                }
+                dataDeclaration = dataDeclaration+returnValue+"\n";
             }else{
-                dataDeclaration = dataDeclaration + returnValue + "\n";
+                if (isArray){
+                    for (int i=1; i<arraySize;i++){
+                        returnValue = returnValue + ", "+getEmptyVarValue(type);
+                    }
+                    dataDeclaration = dataDeclaration + returnValue + "\n";
+                }else{
+                    dataDeclaration = dataDeclaration + returnValue + "\n";
+                }
             }
         }
     }
@@ -41,8 +150,19 @@ public class MipsConverter {
             return "0";
         return null;
     }
-    public void enterMethod(String methodName, int scope){
-        textDeclaration = textDeclaration + methodName+scope+":\n";
+    public void enterMethod(String methodName, int scope, SymbolTable symbolTable){
+        textDeclaration = textDeclaration + methodName+symbolTable.getScopeBefore()+":\n";
+        Method tempMethod = symbolTable.getMethodByName(methodName);
+        ArrayList<Variable> temporalVars=tempMethod.getParameters();
+        for (int i=0; i<temporalVars.size();i++){
+            addVariable(temporalVars.get(i).getName(), scope, temporalVars.get(i).type, temporalVars.get(i).isArray, temporalVars.get(i).arraySize, 0);   
+            if (temporalVars.get(i).getType().equals("int")){
+                textDeclaration = textDeclaration + "sw $a"+i+", "+temporalVars.get(i).getName()+scope+"\n";
+            }else{
+                textDeclaration = textDeclaration + "sb $a"+i+", "+temporalVars.get(i).getName()+scope+"\n";
+            }
+        }
+        
         if ((methodName+scope).equals("main0")){
             inMain=true;
             textDeclaration = addMain() + textDeclaration;
@@ -53,7 +173,7 @@ public class MipsConverter {
             textDeclaration = textDeclaration + addEndOfMain();
         else
             textDeclaration = textDeclaration + "jr $ra\n";
-        registerOcupationDepth--;
+        registerOcupationDepth=0;
     }
     public void addStruct(String structName,int scope){
         structs.add(structName+scope);
@@ -63,32 +183,265 @@ public class MipsConverter {
         inStruct=false;
     }
     
-    public String enterWhile(String whileName, int scope, String comparisson){
-        return whileName+scope+":\n";
-    }
-    public String exitWhile(String whileName, int scope){
-        return "j "+whileName+scope+"\n"+
-        "exit"+whileName+scope+"\n";
-    }
-    public String enterIf(String methodName, int scope){
-        return methodName+scope+":\n";
-    }
-    public String exitIf(String merthodName, int scope){
-        return "jr $ra\n";
-    }
-    public String getVariable (String varname,int scope, String vartype){
-        if (vartype.equals("int")){
-            return "lw $t"+(registerOcupationDepth-1)+", "+varname+scope;
-        }else{
-            return "lb $t"+(registerOcupationDepth-1)+", "+varname+scope;
-        }
-    }
     
     
     public String finishUp(){
         return ".data\n"+dataDeclaration+"\n.text\n"+textDeclaration;
     }
     
+    public void enterIf(int scope, DECAFParser.ExpressionContext ctx, SymbolTable symbolTable, boolean hasElse){
+        textDeclaration=textDeclaration+"if"+scope+ifNumbers.get(ifNumbers.size()-1).toString()+":\n";
+        String nameofExit;
+        recursiveExpressionWriter(ctx, symbolTable, scope);
+        //Realizador de comparador
+        if(hasElse)
+            nameofExit="exitif";
+        else
+            nameofExit="endif";
+        textDeclaration=textDeclaration+"beq $t"+registerOcupationDepth+", $zero, exitif"+scope+ifNumbers.get(ifNumbers.size()-1).toString()+"\n";
+        ifScopes.add(scope);
+        ifNumbers.set(ifNumbers.size()-1,ifNumbers.get(ifNumbers.size()-1)+1);
+        ifNumbers.add(0);
+
+
+    }
+    public void enterElse(){
+        int scope = ifScopes.get(ifScopes.size()-1);
+        textDeclaration=textDeclaration+"j endif"+scope+(ifNumbers.get(ifNumbers.size()-2)-1)+"\n";
+        textDeclaration=textDeclaration+"exitif"+scope+(ifNumbers.get(ifNumbers.size()-2)-1)+":\n";
+    }
+    public void exitIf(){
+        ifNumbers.remove(ifNumbers.size()-1);
+        int scope = ifScopes.get(ifScopes.size()-1);
+        textDeclaration=textDeclaration+"endif"+scope+(ifNumbers.get(ifNumbers.size()-1)-1)+":\n";
+        ifScopes.remove(ifScopes.size()-1);
+    }
+    public void doReturn(DECAFParser.ExpressionContext ctx,SymbolTable symbolTable, int scope){
+        recursiveExpressionWriter(ctx, symbolTable, scope);
+        textDeclaration = textDeclaration + "move $v1, $t"+registerOcupationDepth+"\n";
+        textDeclaration = textDeclaration + "jr $ra\n";
+
+
+    }
+    public void enterWhile(int scope, DECAFParser.ExpressionContext ctx,SymbolTable symbolTable){
+        textDeclaration=textDeclaration+"while"+scope+whileNumbers.get(whileNumbers.size()-1).toString()+":\n";
+        recursiveExpressionWriter(ctx, symbolTable, scope);
+        //Realizador de comparador
+        textDeclaration=textDeclaration+"beq $t"+registerOcupationDepth+", $zero, exitwhile"+scope+whileNumbers.get(whileNumbers.size()-1).toString()+"\n";
+        whileScopes.add(scope);
+        whileNumbers.set(whileNumbers.size()-1,whileNumbers.get(whileNumbers.size()-1)+1);
+        whileNumbers.add(0);
+        
+    }
+    public void exitWhile(){
+        whileNumbers.remove(whileNumbers.size()-1);
+        int scope = whileScopes.get(whileScopes.size()-1);
+        textDeclaration=textDeclaration+"j while"+scope+(whileNumbers.get(whileNumbers.size()-1)-1)+"\n";
+        textDeclaration=textDeclaration+"exitwhile"+scope+(whileNumbers.get(whileNumbers.size()-1)-1)+":\n";
+        whileScopes.remove(whileScopes.size()-1);
+    }
+
+    public void recursiveLocationWriter(DECAFParser.LocationContext ctx, SymbolTable symbolTable,int scope){
+        String variableName = ctx.ID().getText();
+        Variable tempVariable = symbolTable.getVariableInScope(scope, variableName);
+        String type = tempVariable.getType();
+        String loadLine="";
+        if (type.equals("int")){
+            loadLine="lw $t"+registerOcupationDepth+", "+variableName+tempVariable.getScopeCurrent();
+            //Checking if array
+            try{
+                Integer.parseInt(ctx.expression().getText());
+                registerOcupationDepth++;
+                recursiveExpressionWriter(ctx.location().expression(), symbolTable, scope);
+                registerOcupationDepth--;
+                loadLine=loadLine+"($t"+(registerOcupationDepth+1)+")";
+            }catch (Exception e){
+
+            }
+        }else if (type.contains("struct")){
+            Struct tempStruct=symbolTable.getStructInScope(scope, type.substring(6));
+            String attribute = ctx.location().ID().getText();
+            int offset = 0;
+            for (int i=0;i<tempStruct.getAtributes().size();i++){
+                if(!tempStruct.getAtributes().get(i).getName().equals(attribute)){
+                    if(tempStruct.getAtributes().get(i).getType().equals("int")){
+                        offset+=4;
+                    }else if(tempStruct.getAtributes().get(i).getType().contains("struct")){
+                        offset+=symbolTable.getStructInScope(tempVariable.scopeCurrent, tempStruct.getAtributes().get(i).getType().substring(6)).getMemorySize();
+                    }else{
+                        offset+=1;
+                    }
+                }else{
+                    if(tempStruct.getAtributes().get(i).getType().equals("int")){
+                        //Checking if attribute is array
+                        try{
+                            int position = Integer.parseInt(ctx.location().expression().getText());
+                            offset+=(position*4);
+                        }catch(Exception e){
+            
+                        }
+                        loadLine="lw $t"+registerOcupationDepth+", "+variableName+tempVariable.getScopeCurrent()+"+"+offset;
+                    }else{
+                        try{
+                            int position = Integer.parseInt(ctx.location().expression().getText());
+                            offset+=(position);
+                        }catch(Exception e){
+            
+                        }
+                        loadLine="lb $t"+registerOcupationDepth+", "+variableName+tempVariable.getScopeCurrent() +"+"+offset;
+                    }
+                    break;
+                }
+            }
+            //Checking if array
+            try{
+                ctx.location().expression().getText();
+                registerOcupationDepth++;
+                recursiveExpressionWriter(ctx.expression(), symbolTable, scope);
+                registerOcupationDepth--;
+                loadLine=loadLine+"($t"+(registerOcupationDepth+1)+")";
+            }catch (Exception e){
+
+            }
+            
+        }else{
+            loadLine="lb $t"+registerOcupationDepth+", "+variableName+tempVariable.getScopeCurrent();
+            //Checking if array
+            try{
+                Integer.parseInt(ctx.expression().getText());
+                registerOcupationDepth++;
+                recursiveExpressionWriter(ctx.expression(), symbolTable, scope);
+                registerOcupationDepth--;
+                loadLine=loadLine+"($t"+(registerOcupationDepth+1)+")";
+            }catch (Exception e){
+
+            }
+        }
+        textDeclaration = textDeclaration+loadLine+"\n";
+    }
+
+    public void operationWriter(DECAFParser.ExpressionContext exp1, DECAFParser.ExpressionContext exp2, DECAFParser.OpContext opctx,SymbolTable symbolTable, int scope){
+        recursiveExpressionWriter(exp1, symbolTable, scope);
+        registerOcupationDepth++;
+        recursiveExpressionWriter(exp2, symbolTable, scope);
+        registerOcupationDepth--;
+        if(opctx.getText().equals("==")){
+            textDeclaration = textDeclaration + "seq $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals("!=")){
+            textDeclaration = textDeclaration + "sne $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals(">")){
+            textDeclaration = textDeclaration + "sgt $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals(">=")){
+            textDeclaration = textDeclaration + "sge $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals("<")){
+            textDeclaration = textDeclaration + "slt $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals("<=")){
+            textDeclaration = textDeclaration + "sle $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals("+")){
+            textDeclaration = textDeclaration + "add $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals("-")){
+            textDeclaration = textDeclaration + "sub $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals("/")){
+            textDeclaration = textDeclaration + "div $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals("*")){
+            textDeclaration = textDeclaration + "mul $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals("%")){
+            textDeclaration = textDeclaration + "div $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+            textDeclaration = textDeclaration + "mfhi $t"+registerOcupationDepth+"\n";
+        }
+        else if(opctx.getText().equals("&&")){
+            textDeclaration = textDeclaration + "and $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+        else if(opctx.getText().equals("||")){
+            textDeclaration = textDeclaration + "or $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $t"+(registerOcupationDepth+1)+"\n";
+        }
+
+    }
+    public void recursiveExpressionWriter(DECAFParser.ExpressionContext ctx, SymbolTable symbolTable, int scope){
+        //location
+        try{
+            ctx.location().getText();
+            recursiveLocationWriter(ctx.location(), symbolTable, scope);
+        }catch (Exception e){
+
+        }
+        //methodCall
+        try{
+            ctx.methodCall().getText();
+            methodCallWriter(ctx.methodCall(), symbolTable);
+            textDeclaration = textDeclaration + "move $t0, $v1\n";
+            registerOcupationDepth=1;
+        }catch (Exception e){
+
+        }
+        //literal
+        try{
+            ctx.literal().getText();
+            textDeclaration=textDeclaration+"li $t"+registerOcupationDepth+", "+ctx.literal().getText()+"\n";
+
+        }catch (Exception e){
+
+        }
+        //op
+        try{
+            ctx.op().getText();
+            operationWriter(ctx.expression(0), ctx.expression(1), ctx.op(), symbolTable, scope);
+        }catch(Exception e){
+
+        }
+        //negation
+        if(ctx.getText().charAt(0)=='!'){
+            recursiveExpressionWriter(ctx.expression(0), symbolTable, scope);
+            textDeclaration=textDeclaration+"seq $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", $zero\n";
+        }
+        //negative
+        if(ctx.getText().charAt(0)=='-'){
+            recursiveExpressionWriter(ctx.expression(0), symbolTable, scope);
+            textDeclaration=textDeclaration+"mul $t"+registerOcupationDepth+", $t"+registerOcupationDepth+", -1\n";
+        }
+    }
+    public void methodCallWriter(DECAFParser.MethodCallContext ctx, SymbolTable symbolTable){
+        int argQuantity=ctx.arg().size();
+        String methodName = ctx.ID().getText();
+        Method currentMethod=symbolTable.getMethodByName(methodName);
+        int methodScope = currentMethod.getScopeCurrent();
+        methodName=methodName+methodScope;
+        String toAdd="";
+        if(argQuantity==currentMethod.getParameters().size()){
+            for (int i = 0; i<argQuantity;i++){
+                recursiveExpressionWriter(ctx.arg().get(i).expression(), symbolTable, symbolTable.getScopeCurrent()); 
+                toAdd=toAdd+"move $a"+i+", $t"+registerOcupationDepth+"\n";
+            }
+        }
+        toAdd=toAdd +"jal "+methodName+"\n";
+        toAdd=toAdd + "move $t"+registerOcupationDepth+", $v1\n";
+        textDeclaration=textDeclaration+toAdd;
+    }
+    /*
+    private String locationEval(DECAFParser.LocationContext ctx, SymbolTable symbolTable){
+        compiler.setSymbolTable(symbolTable);
+        String type = compiler.recursiveLocationType(ctx, symbolTable.getScopeCurrent());
+        if (type.equals("int")){
+            String a =("lw $t"+registerOcupationDepth+", ");
+        }else{
+
+        }
+        return null;
+    }*/
+    public String argEval(DECAFParser.ArgContext ctx, SymbolTable symbolTable){
+        return null;
+    }
+
     public String divideFunction(){
         String divideFnct;
         divideFnct="divide:\n"+

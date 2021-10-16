@@ -4,6 +4,8 @@ import java.util.ArrayList;
 
 public class Struct extends CommonData{
     private int insideScope;
+    private int memorySize;
+    
     private ArrayList<Variable> attributes = new ArrayList<>();
     public Struct(String type, String name, String signature, String error, String line, String collumn,
             int scopeCurrent, int scopeBefore) {
@@ -21,6 +23,12 @@ public class Struct extends CommonData{
     }
     public void addAttribute(Variable newAttribute){
         attributes.add(newAttribute);
+    }
+    public void setMemorySize(int memorySize){
+        this.memorySize=memorySize;
+    }
+    public int getMemorySize(){
+        return this.memorySize;
     }
     public String toString() {
         return "{" +
