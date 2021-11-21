@@ -3,22 +3,20 @@ package com.compis.clases;
 public class CommonData {
     String type;
     String name;
-    String signature;
-    String error;
     String line;
     String collumn;
     int scopeCurrent;
     int scopeBefore;
+    int offset;
     
-    public CommonData(String type, String name, String signature, String error, String line, String collumn, int scopeCurrent, int scopeBefore){
+    public CommonData(String type, String name, String line, String collumn, int scopeCurrent, int scopeBefore, int offset){
         this.type = type;
         this.name = name;
-        this.signature = signature;
-        this.error = error;
         this.line = line;
         this.collumn = collumn;
         this.scopeCurrent = scopeCurrent;
         this.scopeBefore = scopeBefore;
+        this.offset = offset;
     }
 
     public String getType() {
@@ -35,22 +33,6 @@ public class CommonData {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public String getSignature() {
-        return this.signature;
-    }
-
-    public void setSignature(String signature) {
-        this.signature = signature;
-    }
-
-    public String getError() {
-        return this.error;
-    }
-
-    public void setError(String error) {
-        this.error = error;
     }
 
     public String getLine() {
@@ -85,14 +67,21 @@ public class CommonData {
         this.scopeBefore = scopeBefore;
     }
 
+    public int getOffset() {
+        return this.offset;
+    }
+
+    public void setOffset(int offset) {
+        this.offset = offset;
+    }
+
 
     @Override
     public String toString() {
         return "{" +
             " type='" + getType() + "'" +
             ", name='" + getName() + "'" +
-            ", signature='" + getSignature() + "'" +
-            ", error='" + getError() + "'" +
+            ", offset='" + getOffset() + "'" +
             ", line='" + getLine() + "'" +
             ", collumn='" + getCollumn() + "'" +
             ", scopeCurrent='" + getScopeCurrent() + "'" +
