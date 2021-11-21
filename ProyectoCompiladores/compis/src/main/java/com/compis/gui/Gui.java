@@ -17,8 +17,9 @@ import com.compis.Compiler;
 public class Gui implements ActionListener {
     private JFrame frame = new JFrame();
     private JPanel myPanel = new JPanel();
-    private JTextArea tA1 = new JTextArea(45, 60);
-    private JTextArea console = new JTextArea(45, 60);
+    private JTextArea tA1 = new JTextArea(45, 40);
+    private JTextArea console = new JTextArea(45, 40);
+    private JTextArea mipsVisual = new JTextArea(45, 40);
     private JButton button = new JButton();
 
     public Gui() {
@@ -30,11 +31,15 @@ public class Gui implements ActionListener {
         console.setText("Console: ");
         console.setBackground(Color.BLACK);
         console.setForeground(Color.GREEN);
+        console.setEditable(false);
+        mipsVisual.setEditable(false);
         JScrollPane scrollpane1 = new JScrollPane(tA1);
         JScrollPane scrollpane2 = new JScrollPane(console);
+        JScrollPane scrollpane3 = new JScrollPane(mipsVisual);
         myPanel.add(scrollpane1);
         myPanel.add(button);
         myPanel.add(scrollpane2);
+        myPanel.add(scrollpane3);
 
         frame.add(myPanel, BorderLayout.CENTER);
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -54,20 +59,21 @@ public class Gui implements ActionListener {
 
     private void Compile() {
         Compiler compiler = new Compiler();
-        String returnText = compiler.Compile(tA1.getText());
-        int lenAct = returnText.length();
+        String[] returnText = compiler.Compile(tA1.getText());
+        int lenAct = returnText[0].length();
         int cont = 0;
         for (int i = 0; i < lenAct; i++) {
             if (cont == 120) {
-                returnText = returnText.substring(0, i) + "\n" + returnText.substring(i);
+                returnText[0] = returnText[0].substring(0, i) + "\n" + returnText[0].substring(i);
                 cont = 0;
             }
             cont++;
-            if (returnText.charAt(i) == '\n') {
+            if (returnText[0].charAt(i) == '\n') {
                 cont = 0;
             }
-            lenAct = returnText.length();
+            lenAct = returnText[0].length();
         }
-        console.setText("Console:\n"+returnText);
+        console.setText("Console:\n"+returnText[0]);
+        mipsVisual.setText(returnText[1]);
     }
 }
