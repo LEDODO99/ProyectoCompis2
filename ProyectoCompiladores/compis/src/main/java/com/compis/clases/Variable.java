@@ -3,9 +3,11 @@ package com.compis.clases;
 public class Variable extends CommonData {
     boolean isArray = false;
     int arraySize=0;
-    public Variable(String type, String name, String signature, String error, String line, String collumn,
-            int scopeCurrent, int scopeBefore) {
-        super(type, name, signature, error, line, collumn, scopeCurrent, scopeBefore);
+    boolean isParameter = false;
+    boolean isGlobal = false;
+    public Variable(String type, String name, String line, String collumn,
+            int scopeCurrent, int scopeBefore, int offset) {
+        super(type, name, line, collumn, scopeCurrent, scopeBefore, offset);
         // TODO Auto-generated constructor stub
     }
     public void setIsArray(boolean isArray){
@@ -20,14 +22,25 @@ public class Variable extends CommonData {
     public int getArraySize(){
         return arraySize;
     }
+    public boolean getIsParameter(){
+        return isParameter;
+    }
+    public void setIsParameter(boolean isParameter){
+        this.isParameter=isParameter;
+    }
+    public boolean getIsGlobal(){
+        return isGlobal;
+    }
+    public void setIsGlobal(boolean isGlobal){
+        this.isGlobal=isGlobal;
+    }
 
     @Override
     public String toString() {
         return "{" +
             " type='" + getType() + "'" +
             ", name='" + getName() + "'" +
-            ", signature='" + getSignature() + "'" +
-            ", error='" + getError() + "'" +
+            ", offset='" + getOffset() + "'" +
             ", line='" + getLine() + "'" +
             ", collumn='" + getCollumn() + "'" +
             ", scopeCurrent='" + getScopeCurrent() + "'" +
