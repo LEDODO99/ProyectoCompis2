@@ -1,12 +1,12 @@
 package com.compis.clases;
 
-import java.time.temporal.Temporal;
 import java.util.ArrayList;
 
 public class SymbolTable {
     int scopeCurrent;
     int scopeBefore;
     int offset;
+    private String currentMethodName=null;
     ArrayList<Integer> scopeBefores;
     ArrayList<String> scopes;
     ArrayList<Variable> variables;
@@ -95,7 +95,14 @@ public class SymbolTable {
         if (doesNameExist(name)) {
             return false;
         } else {
-            variables.add(new Variable(type, name, null, null, null, null, scopeCurrent, scopeBefore));
+            Variable tmpVar = new Variable(type, name, null, null, scopeCurrent, scopeBefore,0);
+            if (scopeCurrent == 0)
+                tmpVar.setIsGlobal(true);
+            else
+                tmpVar.setIsGlobal(false);
+                if (currentMethodName!=null)
+                    methods.get(methods.size()-1).addLocalVar(tmpVar);
+            variables.add(tmpVar);
             return true;
         }
     }
@@ -103,7 +110,8 @@ public class SymbolTable {
         if (doesNameExist(name)) {
             return false;
         } else {
-            methods.add(new Method(type, name, null, null, null, null, scopeCurrent, scopeBefore));
+            currentMethodName = name;
+            methods.add(new Method(type, name,  null, null, scopeCurrent, scopeBefore, 0));
             this.scopes.add("Method"+name);
             this.scopeBefore = this.scopeCurrent;
             this.scopeBefores.add(this.scopeBefore);
@@ -115,7 +123,7 @@ public class SymbolTable {
         if (doesNameExist(name)) {
             return false;
         } else {
-            errors.add(new Error(type, name, null, null, null, null, scopeCurrent, scopeBefore));
+            errors.add(new Error(type, name, null, null, scopeCurrent, scopeBefore, 0));
             return true;
         }
     }
@@ -123,7 +131,7 @@ public class SymbolTable {
         if (doesNameExist(name)) {
             return false;
         } else {
-            Struct newstruct= new Struct(type, name, null, null, null, null, scopeCurrent, scopeBefore);
+            Struct newstruct= new Struct(type, name, null, null, scopeCurrent, scopeBefore, 0);
             int structSize=0;
             for (int i=0; i<attrNames.size();i++){
                 if(attrTypes.get(i).equals("int"))
@@ -133,7 +141,7 @@ public class SymbolTable {
                 }else{
                     structSize+=(getStructInScope(scopeCurrent, attrTypes.get(i).substring(6)).getMemorySize()*arrayLengths.get(i));
                 }
-                newstruct.addAttribute(new Variable(attrTypes.get(i),attrNames.get(i),null,null,null,null,scopes.size(), scopeCurrent));
+                newstruct.addAttribute(new Variable(attrTypes.get(i),attrNames.get(i),null,null,scopes.size(), scopeCurrent,0));
             }
             newstruct.setMemorySize(structSize);
             structs.add(newstruct);
@@ -148,6 +156,9 @@ public class SymbolTable {
     public boolean goUpScope(){
         this.scopeCurrent = this.scopeBefore;
         this.scopeBefore = this.scopeBefores.get(this.scopeCurrent);
+        if(currentMethodName!=null){
+            getMethodByName(currentMethodName).goUp();
+        }
         return true;
     }
 
@@ -203,6 +214,9 @@ public class SymbolTable {
         this.scopeBefore = this.scopeCurrent;
         this.scopeBefores.add(this.scopeBefore);
         this.scopeCurrent = scopes.size()-1;
+        if(currentMethodName!=null){
+            getMethodByName(currentMethodName).addScope();
+        }
     }
     public ArrayList<String> getScopes(){
         return scopes;
@@ -220,9 +234,15 @@ public class SymbolTable {
         return structs;
     }
     public void addParameter(String name, String type){
-        addVariable(name, type);
+        Variable tmpVar = new Variable(type, name, null, null, scopeCurrent, scopeBefore,0);
+        tmpVar.setIsGlobal(false);
         int methodPositon = methods.size()-1;
-        methods.get(methodPositon).addParameter(new Variable(type, name, null, null, null, null, scopeCurrent, scopeBefore));
+        methods.get(methodPositon).addParameter(tmpVar);
+        addVariable(name, type);
+        getVariableByName(name).setIsParameter(true);
+    }
+    public void exitMethod(){
+        currentMethodName=null;
     }
 
 }
