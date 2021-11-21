@@ -7,9 +7,9 @@ public class Struct extends CommonData{
     private int memorySize;
     
     private ArrayList<Variable> attributes = new ArrayList<>();
-    public Struct(String type, String name, String signature, String error, String line, String collumn,
-            int scopeCurrent, int scopeBefore) {
-        super(type, name, signature, error, line, collumn, scopeCurrent, scopeBefore);
+    public Struct(String type, String name, String line, String collumn,
+            int scopeCurrent, int scopeBefore, int offset) {
+        super(type, name, line, collumn, scopeCurrent, scopeBefore, offset);
         //TODO Auto-generated constructor stub
     }
     public void setInsideScope(int insideScope){
@@ -34,8 +34,7 @@ public class Struct extends CommonData{
         return "{" +
             " type='" + getType() + "'" +
             ", name='" + getName() + "'" +
-            ", signature='" + getSignature() + "'" +
-            ", error='" + getError() + "'" +
+            ", offset='" + getOffset() + "'" +
             ", line='" + getLine() + "'" +
             ", collumn='" + getCollumn() + "'" +
             ", scopeCurrent='" + getScopeCurrent() + "'" +
