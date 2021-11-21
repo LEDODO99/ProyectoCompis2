@@ -34,7 +34,7 @@ public class Compiler extends DECAFBaseListener {
         this.symbolTable=symbolTable;
     }
 
-    public String Compile(String program) {
+    public String[] Compile(String program) {
         returnMessage = "";
         symbolTable = new SymbolTable();
         DECAFLexer lexer = new DECAFLexer(CharStreams.fromString(program));
@@ -49,7 +49,10 @@ public class Compiler extends DECAFBaseListener {
             returnMessage = "Errors:\n" + returnMessage;
         }
 
-        return returnMessage;
+        String[] returner= new String [2];
+        returner[0]=returnMessage;
+        returner[1]=mipsConverter.finishUp();
+        return returner;
     }
 
     @Override
@@ -173,8 +176,10 @@ public class Compiler extends DECAFBaseListener {
         currentMethodType=null;
         passedReturn=false;
         currentMethodName = null;
+        mipsConverter.exitBlock(symbolTable);
+        mipsConverter.exitMethod(symbolTable);
         symbolTable.goUpScope();
-        mipsConverter.exitMethod();
+        symbolTable.exitMethod();
     }
     @Override
     public void enterReturnStatement(DECAFParser.ReturnStatementContext ctx){
@@ -212,6 +217,7 @@ public class Compiler extends DECAFBaseListener {
     }
     @Override
     public void exitBlock(DECAFParser.BlockContext ctx){
+        mipsConverter.exitBlock(symbolTable);
         symbolTable.goUpScope();
     }
     @Override
@@ -322,7 +328,8 @@ public class Compiler extends DECAFBaseListener {
                 returnMessage = returnMessage + errorCount +". Parameter amount when calling "+methodName+" incorrect\n";
             }
         }
-        mipsConverter.methodCallWriter(ctx, symbolTable);
+        if(returnMethod.getType().equals("void"))
+            mipsConverter.methodCallWriter(ctx, symbolTable);
     }
     public String recursiveLocationType(DECAFParser.LocationContext ctx,int scope){
         String locationName = ctx.ID().getText();
