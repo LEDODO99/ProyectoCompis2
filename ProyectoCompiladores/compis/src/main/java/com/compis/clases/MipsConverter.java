@@ -13,6 +13,10 @@ public class MipsConverter {
     private String textDeclaration="";
     private ArrayList<String> structs = new ArrayList<>();
 
+    private boolean isCallingFunc=false;
+    private String methodBeingCalled=null;
+    private int currentCallOfster=0;
+
     private String currentMethod=null;
 
     private ArrayList<String> ifs = new ArrayList<>();
@@ -236,6 +240,8 @@ public class MipsConverter {
         else{
             int returnOffset = symbolTable.getMethodByName(currentMethod).getDirectionOffset();
             textDeclaration = textDeclaration+"\tlw $ra "+returnOffset+"($sp)\n";
+            int blockSize=symbolTable.getMethodByName(currentMethod).getMethodSize();
+            textDeclaration = textDeclaration + "\taddi $sp, $sp, "+blockSize+"\n";
             textDeclaration = textDeclaration + "\tjr $ra\n";
         }
         registerOcupationDepth=0;
@@ -319,7 +325,7 @@ public class MipsConverter {
         if(tempVariable.isGlobal){
             loadLine=" $t"+registerOcupationDepth+", "+variableName;
         }else{
-            loadLine=" $t"+registerOcupationDepth+", "+symbolTable.getMethodByName(currentMethod).getVariableOffset(variableName)+"($sp)";
+            loadLine=" $t"+registerOcupationDepth+", "+(symbolTable.getMethodByName(currentMethod).getVariableOffset(variableName)+currentCallOfster)+"($sp)";
         }
         if (type.equals("int")){
             loadLine="lw"+loadLine;
@@ -518,6 +524,8 @@ public class MipsConverter {
         }
     }
     public void methodCallWriter(DECAFParser.MethodCallContext ctx, SymbolTable symbolTable){
+        isCallingFunc =true;
+        methodBeingCalled = ctx.ID().getText();
         int argQuantity=ctx.arg().size();
         String methodName = ctx.ID().getText();
         Method currentMethod=symbolTable.getMethodByName(methodName);
@@ -528,15 +536,20 @@ public class MipsConverter {
             for (int i = 0; i<argQuantity;i++){
                 recursiveExpressionWriter(ctx.arg().get(i).expression(), symbolTable, symbolTable.getScopeCurrent()); 
                 if (currentMethod.getParameters().get(i).getType().equals("int")){
-                    toAdd=toAdd+"\taddi $sp, $sp, -4\n\tsw $t"+registerOcupationDepth+", 0($sp)\n";
+                    textDeclaration=textDeclaration+"\taddi $sp, $sp, -4\n\tsw $t"+(registerOcupationDepth)+", 0($sp)\n";
+                    currentCallOfster+=4;
                 }else{
-                    toAdd=toAdd+"\taddi $sp, $sp, -1\n\tsb $t"+registerOcupationDepth+", 0($sp)\n";
+                    textDeclaration=textDeclaration+"\taddi $sp, $sp, -1\n\tsb $t"+(registerOcupationDepth)+", 0($sp)\n";
+                    currentCallOfster+=1;
                 }
             }
         }
         toAdd=toAdd +"\tjal "+methodName+"\n";
         toAdd=toAdd + "\tmove $t"+registerOcupationDepth+", $v1\n";
         textDeclaration=textDeclaration+toAdd;
+        isCallingFunc=false;
+        currentCallOfster=0;
+        methodBeingCalled=null;
     }
     /*
     private String locationEval(DECAFParser.LocationContext ctx, SymbolTable symbolTable){
